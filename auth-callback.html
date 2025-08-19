@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Signing you in…</title>
+  <script src="js/api.js"></script>
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .card { padding: 24px 28px; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.1); max-width: 420px; text-align:center; }
+    .spinner { width: 32px; height: 32px; border: 3px solid rgba(0,0,0,.1); border-top-color: rgba(0,0,0,.6); border-radius: 50%; animation: spin 1s linear infinite; margin: 12px auto 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .muted { color: #555; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="spinner"></div>
+    <div>Finishing sign-in…</div>
+    <div class="muted" id="status">Please wait</div>
+  </div>
+  <script>
+    (async () => {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      const refreshToken = params.get('refreshToken');
+      const status = document.getElementById('status');
+      try {
+        if (!token || !refreshToken) {
+          throw new Error('Missing tokens in callback URL.');
+        }
+        TokenManager.setTokens(token, refreshToken);
+        const me = await api.getCurrentUser();
+        if (me && me.success && me.data && me.data.user) {
+          UserManager.setUser(me.data.user);
+          const role = me.data.user.role;
+          const dest = ApiUtils.getDashboardUrl(role);
+          status.textContent = 'Redirecting you to your dashboard…';
+          window.location.replace(dest);
+        } else {
+          window.location.replace('/student-dashboard.html');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Sorry, we could not complete your sign-in. Please try again.');
+        window.location.replace('/login.html');
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Teacher Dashboard - School Portal</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Your existing API util file (required) -->
+  <script src="js/api.js"></script>
+  <script src="js/session-guard.js"></script>
+
+
+  <style>
+    /* (kept your styles, slightly trimmed for brevity) */
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;color:#222}
+    .dashboard-container{max-width:1400px;margin:20px auto;padding:20px}
+    .header{background:rgba(255,255,255,.95);border-radius:12px;padding:18px;margin-bottom:20px;box-shadow:0 6px 18px rgba(0,0,0,.08)}
+    .header-content{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+    .logout-btn{background:#dc3545;color:#fff;padding:10px 18px;border:none;border-radius:8px;cursor:pointer}
+    .dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+    .dashboard-card{background:rgba(255,255,255,.95);padding:22px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
+    .card-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+    .card-icon{width:48px;height:48px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.25rem}
+    .students-icon{background:linear-gradient(135deg,#667eea,#764ba2)}
+    .attendance-icon{background:linear-gradient(135deg,#f093fb,#f5576c)}
+    .materials-icon{background:linear-gradient(135deg,#4facfe,#00f2fe)}
+    .action-btn{padding:8px 12px;border-radius:8px;border:none;cursor:pointer;text-decoration:none;display:inline-flex;gap:8px;align-items:center}
+    .btn-primary{background:#667eea;color:#fff}
+    .btn-success{background:#28a745;color:#fff}
+    .btn-secondary{background:#6c757d;color:#fff}
+    .recent-list{list-style:none;margin-top:14px}
+    .recent-item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f1f1}
+    .loading{padding:18px;text-align:center;color:#666}
+    .spinner{display:inline-block;width:28px;height:28px;border:3px solid #f3f3f3;border-top:3px solid #667eea;border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+
+    /* modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:9999}
+    .modal{background:#fff;border-radius:10px;padding:18px;min-width:320px;max-width:900px;max-height:85vh;overflow:auto;box-shadow:0 8px 30px rgba(0,0,0,.2)}
+    .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .modal-title{font-size:1.1rem;font-weight:600}
+    .modal-close{background:transparent;border:none;font-size:1.1rem;cursor:pointer}
+    .table{width:100%;border-collapse:collapse}
+    .table th,.table td{padding:8px 10px;border-bottom:1px solid #eee;text-align:left}
+    .form-row{display:flex;gap:8px;margin-bottom:8px}
+    .form-row input,.form-row select{flex:1;padding:8px;border-radius:6px;border:1px solid #ddd}
+    .small{font-size:0.9rem;color:#555}
+    .toast{position:fixed;top:18px;right:18px;background:#17a2b8;color:#fff;padding:12px 16px;border-radius:8px;transform:translateX(300px);transition:transform .28s;z-index:10010}
+    .toast.show{transform:translateX(0)}
+  </style>
+</head>
+<body>
+  <div class="dashboard-container">
+    <div class="header">
+      <div class="header-content">
+        <div class="user-info">
+          <h1 id="teacherName">Welcome, Teacher!</h1>
+          <p id="teacherInfo" class="small">Loading teacher info...</p>
+        </div>
+        <div class="header-actions">
+          <button class="logout-btn" onclick="handleLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+      <!-- My Students -->
+      <div class="dashboard-card">
+        <div class="card-header">
+          <div class="card-icon students-icon"><i class="fas fa-users"></i></div>
+          <div class="card-title">My Students</div>
+        </div>
+        <div class="card-content">
+          <div class="stats-grid">
+            <div class="stat-item"><div class="stat-value" id="totalStudents">--</div><div class="stat-label small">Total Students</div></div>
+            <div class="stat-item"><div class="stat-value" id="activeClasses">--</div><div class="stat-label small">Active Classes</div></div>
+          </div>
+
+          <div style="margin-top:12px">
+            <button class="action-btn btn-primary" onclick="openStudentsModal()"><i class="fas fa-eye"></i> View / Manage Students</button>
+            <button class="action-btn btn-secondary" onclick="openPerformanceModal()"><i class="fas fa-chart-bar"></i> Performance</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Attendance -->
+      <div class="dashboard-card">
+        <div class="card-header">
+          <div class="card-icon attendance-icon"><i class="fas fa-calendar-check"></i></div>
+          <div class="card-title">Attendance</div>
+        </div>
+        <div class="card-content">
+          <div class="stats-grid">
+            <div class="stat-item"><div class="stat-value" id="todayAttendance">--</div><div class="stat-label small">Today's Attendance</div></div>
+            <div class="stat-item"><div class="stat-value" id="pendingAttendance">--</div><div class="stat-label small">Pending</div></div>
+          </div>
+          <div style="margin-top:12px">
+            <button class="action-btn btn-success" onclick="openMarkAttendanceModal()"><i class="fas fa-check"></i> Mark Attendance</button>
+            <button class="action-btn btn-primary" onclick="openAttendanceReportModal()"><i class="fas fa-eye"></i> View Reports</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Study Materials -->
+      <div class="dashboard-card">
+        <div class="card-header">
+          <div class="card-icon materials-icon"><i class="fas fa-book"></i></div>
+          <div class="card-title">Study Materials</div>
+        </div>
+        <div class="card-content">
+          <p class="small">Manage and upload study materials</p>
+          <ul class="recent-list" id="recentMaterials">
+            <li class="loading"><div class="spinner"></div><p>Loading materials...</p></li>
+          </ul>
+          <div style="margin-top:10px">
+            <button class="action-btn btn-success" onclick="openUploadMaterialModal()"><i class="fas fa-upload"></i> Upload New</button>
+            <button class="action-btn btn-primary" onclick="openMaterialsModal()"><i class="fas fa-cog"></i> Manage All</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Student Performance small card -->
+      <div class="dashboard-card">
+        <div class="card-header">
+          <div class="card-icon performance-icon"><i class="fas fa-chart-line"></i></div>
+          <div class="card-title">Student Performance</div>
+        </div>
+        <div class="card-content">
+          <div class="stats-grid">
+            <div class="stat-item"><div class="stat-value" id="avgClassPerformance">--</div><div class="stat-label small">Class Average</div></div>
+            <div class="stat-item"><div class="stat-value" id="topPerformers">--</div><div class="stat-label small">Top Performers</div></div>
+          </div>
+          <div style="margin-top:12px">
+            <button class="action-btn btn-primary" onclick="openPerformanceModal()"><i class="fas fa-analytics"></i> View Analytics</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Announcements -->
+      <div class="dashboard-card">
+        <div class="card-header">
+          <div class="card-icon announcements-icon"><i class="fas fa-bullhorn"></i></div>
+          <div class="card-title">Internal Notices</div>
+        </div>
+        <div class="card-content">
+          <ul class="recent-list" id="recentAnnouncements">
+            <li class="loading"><div class="spinner"></div><p>Loading announcements...</p></li>
+          </ul>
+          <div style="margin-top:10px">
+            <button class="action-btn btn-success" onclick="openCreateAnnouncementModal()"><i class="fas fa-plus"></i> Create Notice</button>
+            <button class="action-btn btn-primary" onclick="openAnnouncementsModal()"><i class="fas fa-list"></i> View All</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Schedule -->
+      <div class="dashboard-card">
+        <div class="card-header">
+          <div class="card-icon schedule-icon"><i class="fas fa-calendar-alt"></i></div>
+          <div class="card-title">My Schedule</div>
+        </div>
+        <div class="card-content">
+          <ul class="recent-list" id="todaySchedule">
+            <li class="loading"><div class="spinner"></div><p>Loading schedule...</p></li>
+          </ul>
+          <div style="margin-top:10px">
+            <button class="action-btn btn-primary" onclick="openScheduleModal()"><i class="fas fa-calendar"></i> Full Schedule</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal backdrop (reused) -->
+  <div id="modalBackdrop" class="modal-backdrop" onclick="closeModal(event)">
+    <div id="modal" class="modal" onclick="EventModel.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">Modal</div>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" style="display:none"></div>
+
+  <script>
+    // ---------- Utilities ----------
+    function showToast(msg, type='info') {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      t.classList.add('show');
+      if (type === 'error') t.style.background = '#dc3545';
+      else if (type === 'success') t.style.background = '#28a745';
+      else t.style.background = '#17a2b8';
+      setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=> t.style.display='none',300); }, 3500);
+    }
+
+    function openModal(title, innerHtml) {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalBody').innerHTML = innerHtml;
+      const b = document.getElementById('modalBackdrop');
+      b.style.display = 'flex';
+    }
+    function closeModal(ev) {
+      if (ev && ev.target && ev.target.id !== 'modalBackdrop') return;
+      document.getElementById('modalBackdrop').style.display = 'none';
+      document.getElementById('modalBody').innerHTML = '';
+    }
+
+    function apiFetchWithFallback(method, path, body=null) {
+      // Try api.* if available
+      if (window.api && typeof window.api === 'object') {
+        // support common patterns like api.getStudents()
+        const name = path.split('/').filter(Boolean).join('_'); // not used but kept
+      }
+      // fallback to direct fetch using ApiUtils.getApiBase()
+      const base = (window.ApiUtils && ApiUtils.getApiBase) ? ApiUtils.getApiBase() : '';
+      const url = base.replace(/\/$/, '') + path;
+      const opts = { method, headers: {} };
+      if (body && !(body instanceof FormData)) {
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(body);
+      } else if (body instanceof FormData) {
+        opts.body = body;
+      }
+      const token = (window.UserManager && UserManager.getToken) ? UserManager.getToken() : null;
+      if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+      return fetch(url, opts).then(async res => {
+        const text = await res.text();
+        try { return JSON.parse(text); } catch(e) { return { success: res.ok, data: text }; }
+      });
+    }
+
+    // ---------- Auth + Init ----------
+    document.addEventListener('DOMContentLoaded', async () => {
+      // requireAuth & role check
+      if (window.ApiUtils && ApiUtils.requireAuth) {
+        if (!ApiUtils.requireAuth()) return;
+        if (!ApiUtils.requireRole || !ApiUtils.requireRole('teacher')) {
+          showToast('Unauthorized - teacher role required', 'error'); return;
+        }
+      }
+      // load user
+      const user = (window.UserManager && UserManager.getUser) ? UserManager.getUser() : null;
+      if (user) updateUserInfo(user);
+
+      // load dashboard data
+      await loadDashboardData();
+    });
+
+    function updateUserInfo(user) {
+      document.getElementById('teacherName').textContent = `Welcome, ${user.firstName || user.name || 'Teacher'}!`;
+      document.getElementById('teacherInfo').textContent = `Employee ID: ${user.employeeId || user.id || '-'} | Department: ${user.academic?.department || 'General'}`;
+    }
+
+    async function handleLogout() {
+      try {
+        if (window.api && api.logout) await api.logout();
+      } catch(e) { console.warn(e) }
+      // try fallback
+      if (window.api && api.handleLogout) api.handleLogout();
+      else if (window.UserManager && UserManager.clear) UserManager.clear();
+      window.location.href = '/'; // redirect to home/login
+    }
+
+    // ---------- Load Dashboard Data ----------
+    async function loadDashboardData() {
+      try {
+        // 1) dashboard summary (try api helper)
+        let dashRes = null;
+        if (window.api && api.getTeacherDashboard) {
+          dashRes = await api.getTeacherDashboard();
+        } else {
+          dashRes = await apiFetchWithFallback('GET', '/api/teacher/dashboard');
+        }
+        if (dashRes && dashRes.success && dashRes.data) {
+          const d = dashRes.data;
+          document.getElementById('totalStudents').textContent = d.students?.total ?? '--';
+          document.getElementById('activeClasses').textContent = d.classes?.active ?? '--';
+          document.getElementById('todayAttendance').textContent = d.attendance?.todayMarked ?? '--';
+          document.getElementById('pendingAttendance').textContent = d.attendance?.pending ?? '--';
+          document.getElementById('avgClassPerformance').textContent = d.performance?.classAverage ?? '--';
+          document.getElementById('topPerformers').textContent = (d.performance?.topPerformers || '--');
+        }
+
+        // load small lists
+        loadRecentMaterials();
+        loadRecentAnnouncements();
+        loadTodaySchedule();
+      } catch (err) {
+        console.error('loadDashboardData', err);
+        showToast('Failed to load dashboard data', 'error');
+      }
+    }
+
+    // ---------- Recent / Small lists ----------
+    async function loadRecentMaterials() {
+      const container = document.getElementById('recentMaterials');
+      try {
+        let res;
+        if (window.api && api.getTeacherMaterials) res = await api.getTeacherMaterials({ limit: 5 });
+        else res = await apiFetchWithFallback('GET', '/api/teacher/study-materials?limit=5');
+
+        if (res && res.success && Array.isArray(res.data) && res.data.length) {
+          container.innerHTML = res.data.map(m=>`
+            <li class="recent-item">
+              <div class="item-info">
+                <div class="item-title">${escapeHtml(m.title)}</div>
+                <div class="item-subtitle small">${m.subject?.name || 'General'} • ${formatDate(m.publishDate)}</div>
+              </div>
+              <span class="item-badge small">${m.type || ''}</span>
+            </li>
+          `).join('');
+        } else {
+          container.innerHTML = '<li class="recent-item"><div class="item-info">No materials uploaded yet</div></li>';
+        }
+      } catch (err) {
+        console.error(err);
+        container.innerHTML = '<li class="recent-item"><div class="item-info">Error loading materials</div></li>';
+      }
+    }
+
+    async function loadRecentAnnouncements() {
+      const container = document.getElementById('recentAnnouncements');
+      try {
+        let res;
+        if (window.api && api.getTeacherAnnouncements) res = await api.getTeacherAnnouncements({ limit: 5 });
+        else res = await apiFetchWithFallback('GET', '/api/teacher/announcements?limit=5');
+
+        if (res && res.success && Array.isArray(res.data) && res.data.length) {
+          container.innerHTML = res.data.map(a=>`
+            <li class="recent-item">
+              <div class="item-info">
+                <div class="item-title">${escapeHtml(a.title)}</div>
+                <div class="item-subtitle small">Created ${formatDate(a.createdAt)}</div>
+              </div>
+              <span class="item-badge small">${escapeHtml(a.priority||'Info')}</span>
+            </li>
+          `).join('');
+        } else {
+          container.innerHTML = '<li class="recent-item"><div class="item-info">No announcements</div></li>';
+        }
+      } catch(err) {
+        console.error(err);
+        container.innerHTML = '<li class="recent-item"><div class="item-info">Error loading announcements</div></li>';
+      }
+    }
+
+    async function loadTodaySchedule() {
+      const container = document.getElementById('todaySchedule');
+      try {
+        let res;
+        if (window.api && api.getTeacherSchedule) res = await api.getTeacherSchedule();
+        else res = await apiFetchWithFallback('GET', '/api/teacher/schedule/today');
+
+        if (res && res.success && Array.isArray(res.data) && res.data.length) {
+          container.innerHTML = res.data.map(s=>`
+            <li class="recent-item">
+              <div class="item-info">
+                <div class="item-title">${escapeHtml(s.title || s.subjectName || 'Class')}</div>
+                <div class="item-subtitle small">${s.startTime? formatDateTime(s.startTime) : s.time || ''} • ${s.location || ''}</div>
+              </div>
+            </li>
+          `).join('');
+        } else {
+          container.innerHTML = '<li class="recent-item"><div class="item-info">No schedule for today</div></li>';
+        }
+      } catch (err) {
+        console.error(err);
+        container.innerHTML = '<li class="recent-item"><div class="item-info">Error loading schedule</div></li>';
+      }
+    }
+
+    // ---------- Students management ----------
+    async function openStudentsModal() {
+      // Render a modal with students table and quick create
+      openModal('Manage Students', '<div id="studentsArea"><div class="loading"><div class="spinner"></div> Loading students...</div></div>');
+      await loadStudents();
+    }
+
+    async function loadStudents() {
+      const area = document.getElementById('studentsArea');
+      try {
+        let res;
+        if (window.api && api.getStudents) res = await api.getStudents({teacher:true});
+        else res = await apiFetchWithFallback('GET','/api/teacher/students');
+
+        if (!(res && res.success && Array.isArray(res.data))) {
+          area.innerHTML = '<div class="small">No students found.</div>';
+          return;
+        }
+
+        area.innerHTML = `
+          <div style="margin-bottom:8px">
+            <button class="action-btn btn-success" onclick="showCreateStudentForm()"><i class="fas fa-plus"></i> Add Student</button>
+            <button class="action-btn" onclick="loadStudents()"><i class="fas fa-sync"></i> Refresh</button>
+          </div>
+          <table class="table" id="studentsTable">
+            <thead><tr><th>Name</th><th>Class</th><th>Roll</th><th>Actions</th></tr></thead>
+            <tbody>
+              ${res.data.map(s=>`<tr data-id="${s._id}">
+                <td>${escapeHtml(s.firstName || '')} ${escapeHtml(s.lastName || '')}</td>
+                <td>${escapeHtml(s.className || s.class || '')}</td>
+                <td>${escapeHtml(s.roll || '')}</td>
+                <td>
+                  <button class="action-btn btn-primary" onclick="openEditStudentModal('${s._id}')"><i class="fas fa-edit"></i></button>
+                  <button class="action-btn btn-secondary" onclick="confirmDeleteStudent('${s._id}')"><i class="fas fa-trash"></i></button>
+                </td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        `;
+      } catch(err) {
+        console.error(err);
+        area.innerHTML = '<div class="small">Error loading students</div>';
+      }
+    }
+
+    function showCreateStudentForm() {
+      const html = `
+        <div>
+          <div class="form-row">
+            <input id="new_firstName" placeholder="First name" />
+            <input id="new_lastName" placeholder="Last name" />
+          </div>
+          <div class="form-row">
+            <input id="new_class" placeholder="Class" />
+            <input id="new_roll" placeholder="Roll number" />
+          </div>
+          <div style="margin-top:8px">
+            <button class="action-btn btn-success" onclick="createStudent()">Create</button>
+            <button class="action-btn" onclick="loadStudents()">Cancel</button>
+          </div>
+        </div>
+      `;
+      const area = document.getElementById('studentsArea');
+      area.insertAdjacentHTML('afterbegin', html);
+    }
+
+    async function createStudent() {
+      const payload = {
+        firstName: document.getElementById('new_firstName').value.trim(),
+        lastName: document.getElementById('new_lastName').value.trim(),
+        class: document.getElementById('new_class').value.trim(),
+        roll: document.getElementById('new_roll').value.trim()
+      };
+      try {
+        let res;
+        if (window.api && api.createStudent) res = await api.createStudent(payload);
+        else res = await apiFetchWithFallback('POST','/api/teacher/students', payload);
+
+        if (res && res.success) {
+          showToast('Student created', 'success');
+          await loadStudents();
+        } else {
+          showToast('Failed to create student', 'error');
+        }
+      } catch(err) {
+        console.error(err);
+        showToast('Error creating student', 'error');
+      }
+    }
+
+    async function openEditStudentModal(id) {
+      openModal('Edit Student', '<div class="loading"><div class="spinner"></div> Loading...</div>');
+      try {
+        let res;
+        if (window.api && api.getStudent) res = await api.getStudent(id);
+        else res = await apiFetchWithFallback('GET', '/api/teacher/students/' + id);
+
+        if (!(res && res.success && res.data)) {
+          document.getElementById('modalBody').innerHTML = '<div class="small">Student not found</div>';
+          return;
+        }
+        const s = res.data;
+        const html = `
+          <div>
+            <div class="form-row">
+              <input id="edit_firstName" value="${escapeAttr(s.firstName||'')}" placeholder="First name" />
+              <input id="edit_lastName" value="${escapeAttr(s.lastName||'')}" placeholder="Last name" />
+            </div>
+            <div class="form-row">
+              <input id="edit_class" value="${escapeAttr(s.class || s.className || '')}" placeholder="Class" />
+              <input id="edit_roll" value="${escapeAttr(s.roll||'')}" placeholder="Roll" />
+            </div>
+            <div style="margin-top:8px">
+              <button class="action-btn btn-primary" onclick="updateStudent('${id}')">Save</button>
+              <button class="action-btn btn-secondary" onclick="closeModal()">Cancel</button>
+            </div>
+          </div>
+        `;
+        document.getElementById('modalBody').innerHTML = html;
+      } catch(err) {
+        console.error(err);
+        document.getElementById('modalBody').innerHTML = '<div class="small">Error loading student</div>';
+      }
+    }
+
+    async function updateStudent(id) {
+      const payload = {
+        firstName: document.getElementById('edit_firstName').value.trim(),
+        lastName: document.getElementById('edit_lastName').value.trim(),
+        class: document.getElementById('edit_class').value.trim(),
+        roll: document.getElementById('edit_roll').value.trim()
+      };
+      try {
+        let res;
+        if (window.api && api.updateStudent) res = await api.updateStudent(id, payload);
+        else res = await apiFetchWithFallback('PUT', '/api/teacher/students/' + id, payload);
+
+        if (res && res.success) {
+          showToast('Student updated','success');
+          await loadStudents();
+          closeModal();
+        } else {
+          showToast('Failed to update student','error');
+        }
+      } catch(err) {
+        console.error(err);
+        showToast('Error updating student','error');
+      }
+    }
+
+    function confirmDeleteStudent(id) {
+      openModal('Delete Student', `
+        <div>
+          <p class="small">Are you sure you want to delete this student?</p>
+          <div style="margin-top:8px">
+            <button class="action-btn btn-secondary" onclick="deleteStudent('${id}')">Yes, Delete</button>
+            <button class="action-btn" onclick="closeModal()">Cancel</button>
+          </div>
+        </div>
+      `);
+    }
+
+    async function deleteStudent(id) {
+      try {
+        let res;
+        if (window.api && api.deleteStudent) res = await api.deleteStudent(id);
+        else res = await apiFetchWithFallback('DELETE', '/api/teacher/students/' + id);
+
+        if (res && res.success) {
+          showToast('Student deleted','success');
+          await loadStudents();
+          closeModal();
+        } else {
+          showToast('Failed to delete','error');
+        }
+      } catch(err) {
+        console.error(err);
+        showToast('Error deleting student','error');
+      }
+    }
+
+    // ---------- Attendance ----------
+    async function openMarkAttendanceModal() {
+      openModal('Mark Attendance', '<div class="loading"><div class="spinner"></div> Loading students...</div>');
+      try {
+        let res;
+        if (window.api && api.getStudents) res = await api.getStudents({teacher:true});
+        else res = await apiFetchWithFallback('GET','/api/teacher/students');
+
+        if (!(res && res.success && Array.isArray(res.data))) {
+          document.getElementById('modalBody').innerHTML = '<div class="small">No students available</div>';
+          return;
+        }
+        const rows = res.data.map(s=>`
+          <tr>
+            <td>${escapeHtml(s.firstName||'')} ${escapeHtml(s.lastName||'')}</td>
+            <td>${escapeHtml(s.class||s.className||'')}</td>
+            <td><select id="att_${s._id}"><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option></select></td>
+          </tr>
+        `).join('');
+        document.getElementById('modalBody').innerHTML = `
+          <div>
+            <table class="table"><thead><tr><th>Name</th><th>Class</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
+            <div style="margin-top:10px">
+              <button class="action-btn btn-success" onclick="submitAttendance()">Submit Attendance</button>
+              <button class="action-btn" onclick="closeModal()">Cancel</button>
+            </div>
+          </div>
+        `;
+      } catch(err) {
+        console.error(err);
+        document.getElementById('modalBody').innerHTML = '<div class="small">Error loading</div>';
+      }
+    }
+
+    async function submitAttendance() {
+      try {
+        const selects = document.querySelectorAll('[id^="att_"]');
+        const payload = [];
+        selects.forEach(s=>{
+          const id = s.id.replace('att_','');
+          payload.push({ studentId: id, status: s.value });
+        });
+
+        let res;
+        if (window.api && api.markAttendance) res = await api.markAttendance({ entries: payload });
+        else res = await apiFetchWithFallback('POST', '/api/teacher/attendance', { entries: payload });
+
+        if (res && res.success) {
+          showToast('Attendance submitted','success'); closeModal(); loadDashboardData();
+        } else showToast('Failed to save attendance','error');
+      } catch(err) {
+        console.error(err); showToast('Error submitting attendance','error');
+      }
+    }
+
+    async function openAttendanceReportModal() {
+      openModal('Attendance Reports', '<div class="loading"><div class="spinner"></div> Loading reports...</div>');
+      try {
+        let res;
+        if (window.api && api.getAttendance) res = await api.getAttendance();
+        else res = await apiFetchWithFallback('GET', '/api/teacher/attendance/reports');
+
+        if (!(res && res.success && Array.isArray(res.data))) {
+          document.getElementById('modalBody').innerHTML = '<div class="small">No attendance reports</div>'; return;
+        }
+        const rows = res.data.map(r=>`<tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.summary || '')}</td></tr>`).join('');
+        document.getElementById('modalBody').innerHTML = `<table class="table"><thead><tr><th>Date</th><th>Summary</th></tr></thead><tbody>${rows}</tbody></table>`;
+      } catch(err){console.error(err); document.getElementById('modalBody').innerHTML = '<div class="small">Error loading reports</div>'}
+    }
+
+    // ---------- Study materials ----------
+    async function openUploadMaterialModal() {
+      openModal('Upload Material', `
+        <div>
+          <div class="form-row">
+            <input id="mat_title" placeholder="Title" />
+            <input id="mat_subject" placeholder="Subject" />
+          </div>
+          <div class="form-row">
+            <select id="mat_type"><option value="pdf">PDF</option><option value="video">Video</option><option value="doc">Document</option></select>
+            <input id="mat_file" type="file" />
+          </div>
+          <div style="margin-top:8px">
+            <button class="action-btn btn-success" onclick="uploadMaterial()">Upload</button>
+            <button class="action-btn" onclick="closeModal()">Cancel</button>
+          </div>
+        </div>
+      `);
+    }
+
+    async function uploadMaterial() {
+      const title = document.getElementById('mat_title').value.trim();
+      const subject = document.getElementById('mat_subject').value.trim();
+      const type = document.getElementById('mat_type').value;
+      const fileInput = document.getElementById('mat_file');
+      if (!fileInput.files.length) { showToast('Please select a file','warning'); return; }
+      const fd = new FormData();
+      fd.append('file', fileInput.files[0]);
+      fd.append('title', title);
+      fd.append('subject', subject);
+      fd.append('type', type);
+
+      try {
+        let res;
+        if (window.api && api.uploadMaterial) res = await api.uploadMaterial(fd);
+        else res = await apiFetchWithFallback('POST', '/api/teacher/study-materials', fd);
+
+        if (res && res.success) {
+          showToast('Material uploaded','success'); closeModal(); loadRecentMaterials();
+        } else showToast('Upload failed','error');
+      } catch(err){console.error(err); showToast('Error uploading','error')}
+    }
+
+    async function openMaterialsModal() {
+      openModal('Manage Materials', '<div class="loading"><div class="spinner"></div> Loading...</div>');
+      try {
+        let res;
+        if (window.api && api.getTeacherMaterials) res = await api.getTeacherMaterials();
+        else res = await apiFetchWithFallback('GET', '/api/teacher/study-materials');
+
+        if (!(res && res.success && Array.isArray(res.data))) {
+          document.getElementById('modalBody').innerHTML = '<div class="small">No materials</div>'; return;
+        }
+
+        const rows = res.data.map(m=>`
+          <tr data-id="${m._id}">
+            <td>${escapeHtml(m.title)}</td>
+            <td>${escapeHtml(m.subject?.name||m.subject||'')}</td>
+            <td>${escapeHtml(m.type||'')}</td>
+            <td>
+              <a class="action-btn btn-primary" href="${escapeAttr(m.fileUrl||('#'))}" target="_blank"><i class="fas fa-download"></i></a>
+              <button class="action-btn btn-secondary" onclick="confirmDeleteMaterial('${m._id}')"><i class="fas fa-trash"></i></button>
+            </td>
+          </tr>
+        `).join('');
+        document.getElementById('modalBody').innerHTML = `<table class="table"><thead><tr><th>Title</th><th>Subject</th><th>Type</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`;
+      } catch(err){console.error(err); document.getElementById('modalBody').innerHTML = '<div class="small">Error loading materials</div>'}
+    }
+
+    function confirmDeleteMaterial(id) {
+      openModal('Delete Material', `<div class="small">Delete this material?</div><div style="margin-top:8px"><button class="action-btn btn-secondary" onclick="deleteMaterial('${id}')">Delete</button><button class="action-btn" onclick="closeModal()">Cancel</button></div>`);
+    }
+
+    async function deleteMaterial(id) {
+      try {
+        let res;
+        if (window.api && api.deleteMaterial) res = await api.deleteMaterial(id);
+        else res = await apiFetchWithFallback('DELETE', '/api/teacher/study-materials/' + id);
+
+        if (res && res.success) { showToast('Material deleted','success'); closeModal(); loadRecentMaterials(); }
+        else showToast('Delete failed','error');
+      } catch(err){console.error(err); showToast('Error deleting','error')}
+    }
+
+    // ---------- Announcements ----------
+    async function openCreateAnnouncementModal() {
+      openModal('Create Announcement', `
+        <div>
+          <input id="ann_title" placeholder="Title" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd;margin-bottom:8px" />
+          <textarea id="ann_body" rows="5" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd"></textarea>
+          <div style="margin-top:8px">
+            <select id="ann_priority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select>
+            <button class="action-btn btn-success" onclick="createAnnouncement()">Create</button>
+            <button class="action-btn" onclick="closeModal()">Cancel</button>
+          </div>
+        </div>
+      `);
+    }
+
+    async function createAnnouncement() {
+      const payload = { title: document.getElementById('ann_title').value.trim(), body: document.getElementById('ann_body').value.trim(), priority: document.getElementById('ann_priority').value };
+      try {
+        let res;
+        if (window.api && api.createAnnouncement) res = await api.createAnnouncement(payload);
+        else res = await apiFetchWithFallback('POST', '/api/teacher/announcements', payload);
+
+        if (res && res.success) { showToast('Announcement created','success'); closeModal(); loadRecentAnnouncements(); }
+        else showToast('Failed to create announcement','error');
+      } catch(err){console.error(err); showToast('Error','error')}
+    }
+
+    async function openAnnouncementsModal() {
+      openModal('Manage Announcements', '<div class="loading"><div class="spinner"></div> Loading...</div>');
+      try {
+        let res;
+        if (window.api && api.getTeacherAnnouncements) res = await api.getTeacherAnnouncements();
+        else res = await apiFetchWithFallback('GET', '/api/teacher/announcements');
+
+        if (!(res && res.success && Array.isArray(res.data))) {
+          document.getElementById('modalBody').innerHTML = '<div class="small">No announcements</div>'; return;
+        }
+
+        const rows = res.data.map(a=>`
+          <tr data-id="${a._id}">
+            <td>${escapeHtml(a.title)}</td>
+            <td>${escapeHtml(a.priority)}</td>
+            <td>${formatDate(a.createdAt)}</td>
+            <td>
+              <button class="action-btn btn-secondary" onclick="confirmDeleteAnnouncement('${a._id}')"><i class="fas fa-trash"></i></button>
+            </td>
+          </tr>
+        `).join('');
+        document.getElementById('modalBody').innerHTML = `<table class="table"><thead><tr><th>Title</th><th>Priority</th><th>Date</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`;
+      } catch(err){console.error(err); document.getElementById('modalBody').innerHTML = '<div class="small">Error loading</div>'}
+    }
+
+    function confirmDeleteAnnouncement(id) {
+      openModal('Delete Announcement', `<div class="small">Delete announcement?</div><div style="margin-top:8px"><button class="action-btn btn-secondary" onclick="deleteAnnouncement('${id}')">Delete</button><button class="action-btn" onclick="closeModal()">Cancel</button></div>`);
+    }
+
+    async function deleteAnnouncement(id) {
+      try {
+        let res;
+        if (window.api && api.deleteAnnouncement) res = await api.deleteAnnouncement(id);
+        else res = await apiFetchWithFallback('DELETE', '/api/teacher/announcements/' + id);
+
+        if (res && res.success) { showToast('Deleted','success'); closeModal(); loadRecentAnnouncements(); }
+        else showToast('Delete failed','error');
+      } catch(err){console.error(err); showToast('Error deleting','error')}
+    }
+
+    // ---------- Performance (simple viewer) ----------
+    async function openPerformanceModal() {
+      openModal('Performance Analytics', '<div class="loading"><div class="spinner"></div> Loading...</div>');
+      try {
+        let res;
+        if (window.api && api.getTeacherPerformance) res = await api.getTeacherPerformance();
+        else res = await apiFetchWithFallback('GET', '/api/teacher/performance/overview');
+
+        if (!(res && res.success && res.data)) {
+          document.getElementById('modalBody').innerHTML = '<div class="small">No performance data</div>'; return;
+        }
+
+        const d = res.data;
+        document.getElementById('modalBody').innerHTML = `
+          <div>
+            <p class="small">Class Average: <strong>${escapeHtml(d.classAverage || '--')}</strong></p>
+            <p class="small">Top Performers: <strong>${escapeHtml((d.topPerformers || []).slice(0,5).map(x=>x.name).join(', ') || '--')}</strong></p>
+            <div style="margin-top:8px"><button class="action-btn" onclick="closeModal()">Close</button></div>
+          </div>
+        `;
+      } catch(err){console.error(err); document.getElementById('modalBody').innerHTML = '<div class="small">Error loading performance</div>'}
+    }
+
+    // ---------- Schedule ----------
+    async function openScheduleModal() {
+      openModal('Full Schedule', '<div class="loading"><div class="spinner"></div> Loading...</div>');
+      try {
+        let res;
+        if (window.api && api.getTeacherSchedule) res = await api.getTeacherSchedule();
+        else res = await apiFetchWithFallback('GET', '/api/teacher/schedule');
+
+        if (!(res && res.success && Array.isArray(res.data))) {
+          document.getElementById('modalBody').innerHTML = '<div class="small">No schedule</div>'; return;
+        }
+        const rows = res.data.map(s=>`<tr><td>${formatDate(s.date||s.startTime) || '-'}</td><td>${escapeHtml(s.title||s.subject||'')}</td><td>${escapeHtml(s.location||'')}</td></tr>`).join('');
+        document.getElementById('modalBody').innerHTML = `<table class="table"><thead><tr><th>Date</th><th>Title</th><th>Location</th></tr></thead><tbody>${rows}</tbody></table>`;
+      } catch(err){console.error(err); document.getElementById('modalBody').innerHTML = '<div class="small">Error loading</div>'}
+    }
+
+    // ---------- Helpers ----------
+    function escapeHtml(s) { if (!s && s!==0) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function escapeAttr(s) { return (''+ (s||'')).replace(/"/g,'&quot;'); }
+    function formatDate(d) { if (!d) return ''; try { const dt = new Date(d); return dt.toLocaleDateString(); } catch(e) { return d || '' } }
+    function formatDateTime(d) { if (!d) return ''; try { const dt = new Date(d); return dt.toLocaleString(); } catch(e) { return d || '' } }
+
+  </script>
+  
+    <script src="js/session-guard.js"></script>
+    <script>
+
+  // Populate header user name and id dynamically
+  (async function __initDashboardHeader(){
+    try {
+      const res = await api.getCurrentUser();
+      if (res?.success) {
+        const user = res.data.user;
+        const nameEl = document.querySelector('[data-user-name]') || document.querySelector('.welcome h1, .header h1, .welcome-title');
+        if (nameEl) nameEl.textContent = `Welcome, ${user.firstName || user.name || 'User'}!`;
+        const empEl = document.querySelector('[data-user-meta]');
+        if (empEl) {
+          empEl.textContent = user.employeeId ? `Employee ID: ${user.employeeId} | Department: ${user.department || 'General'}`
+                         : user.studentId ? `Student ID: ${user.studentId} | Class: ${user.academic?.class || ''}`
+                         : '';
+        }
+      }
+    } catch(e) { console.warn(e); }
+  })();
+</script>
+
+</body>
+</html>
