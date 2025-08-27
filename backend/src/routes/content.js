@@ -64,5 +64,14 @@ router.post('/gallery', authMiddleware, requireRole('teacher'), (req, res) => {
   res.json({ id: r.lastInsertRowid })
 })
 
+// Contact messages
+router.post('/contact', (req, res) => {
+  const { name, email, message } = req.body
+  if (!name || !email || !message) return res.status(400).json({ error: 'Missing fields' })
+  const db = getDb()
+  const r = db.prepare('INSERT INTO contact_messages (name, email, message) VALUES (?,?,?)').run(name, email, message)
+  res.json({ id: r.lastInsertRowid })
+})
+
 module.exports = router
 

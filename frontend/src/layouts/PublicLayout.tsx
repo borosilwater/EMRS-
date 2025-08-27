@@ -1,6 +1,8 @@
 import { Outlet, NavLink } from 'react-router-dom'
+import { useAuthStore } from '@/store/auth'
 
 function PublicLayout() {
+  const { user, logout } = useAuthStore()
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans">
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-gray-100">
@@ -23,8 +25,14 @@ function PublicLayout() {
               <NavLink to="/contact" className={({isActive}) => `hover:text-primary-700 ${isActive ? 'text-primary-700' : 'text-gray-700'}`}>Contact</NavLink>
             </nav>
             <div className="hidden md:flex items-center gap-3">
-              <NavLink to="/login" className="px-3 py-2 text-sm font-semibold text-primary-700">Log in</NavLink>
-              <NavLink to="/register" className="px-4 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-md">Apply Now</NavLink>
+              {!user && <NavLink to="/login" className="px-3 py-2 text-sm font-semibold text-primary-700">Log in</NavLink>}
+              {!user && <NavLink to="/register" className="px-4 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-md">Apply Now</NavLink>}
+              {user && (
+                <>
+                  <NavLink to={user.role === 'teacher' ? '/dashboard/teacher' : '/dashboard/student'} className="px-3 py-2 text-sm font-semibold text-primary-700">Dashboard</NavLink>
+                  <button onClick={logout} className="px-4 py-2 text-sm font-semibold text-white bg-gray-800 hover:bg-black rounded-md">Logout</button>
+                </>
+              )}
             </div>
           </div>
         </div>

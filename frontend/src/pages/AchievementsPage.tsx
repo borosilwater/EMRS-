@@ -1,9 +1,13 @@
+import { useEffect, useState } from 'react'
+import { api } from '@/lib/api'
+
+type Ach = { id: number; title: string; description: string }
+
 function AchievementsPage() {
-  const achievements = [
-    { title: 'State-level Science Fair Winners', desc: 'Team EMRS Dornala won first prize at state science fair 2024.' },
-    { title: 'Sports Championship', desc: 'Girls football team clinched inter-district championship 2025.' },
-    { title: '100% Board Results in Grade X', desc: 'All students passed with distinction in CBSE Grade X.' },
-  ]
+  const [achievements, setAchievements] = useState<Ach[]>([])
+  useEffect(() => {
+    api.get('/achievements').then((res) => setAchievements(res.data))
+  }, [])
 
   return (
     <div>
@@ -14,7 +18,7 @@ function AchievementsPage() {
         {achievements.map((a) => (
           <div key={a.title} className="rounded-xl border border-gray-100 bg-white shadow-sm p-6">
             <h3 className="font-semibold text-lg">{a.title}</h3>
-            <p className="mt-2 text-gray-700">{a.desc}</p>
+            <p className="mt-2 text-gray-700">{a.description}</p>
           </div>
         ))}
       </section>

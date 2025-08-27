@@ -67,6 +67,14 @@ function initDb() {
     date TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(student_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS contact_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
   `)
 
   // Seed teacher if none

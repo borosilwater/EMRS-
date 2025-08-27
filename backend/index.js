@@ -1,5 +1,6 @@
 require('dotenv').config()
 const express = require('express')
+const path = require('path')
 const cors = require('cors')
 const morgan = require('morgan')
 const cookieParser = require('cookie-parser')
@@ -28,6 +29,13 @@ app.get('/api/health', (req, res) => res.json({ ok: true }))
 app.use('/api/auth', authRoutes)
 app.use('/api', contentRoutes)
 app.use('/api', resultsRoutes)
+
+// Static frontend in production
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.join(__dirname, '..', 'frontend', 'dist')
+  app.use(express.static(distPath))
+  app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')))
+}
 
 // Global error handler
 // eslint-disable-next-line no-unused-vars

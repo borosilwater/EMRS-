@@ -1,7 +1,16 @@
 import { NavLink } from 'react-router-dom'
 import AnnouncementBar from '@/components/AnnouncementBar'
+import { useEffect, useState } from 'react'
+import { api } from '@/lib/api'
+import GalleryGrid from '@/components/GalleryGrid'
+
+type Announcement = { id: number; title: string; content: string }
 
 function HomePage() {
+  const [anns, setAnns] = useState<Announcement[]>([])
+  useEffect(() => {
+    api.get('/announcements').then((res) => setAnns(res.data))
+  }, [])
   return (
     <div>
       {/* Hero */}
@@ -24,7 +33,7 @@ function HomePage() {
       </section>
 
       {/* Announcement ticker */}
-      <AnnouncementBar items={["Admissions for 2025-26 are open","EMRS students achieved 98% pass rate","New STEM lab inaugurated","Affiliated to CBSE under NESTS"]} />
+      <AnnouncementBar items={anns.length ? anns.map(a => a.title) : ["Admissions for 2025-26 are open","EMRS students achieved 98% pass rate","New STEM lab inaugurated","Affiliated to CBSE under NESTS"]} />
 
       {/* Highlights */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
@@ -44,6 +53,7 @@ function HomePage() {
           ))}
         </div>
       </section>
+      <GalleryGrid />
     </div>
   )
 }
